@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DARK SYNTERN</title>
+
+<style>
+*{box-sizing:border-box;font-family:monospace}
+body{
+margin:0;
+background:black;
+color:white;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+/* Text welcome */
+.login-title {
+    color: white;
+    font-family:monospace;
+    font-size: 35px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.login-subtitle {
+    color: #aaa;
+    font-family:monospace;
+    font-size: 15px;
+    margin-bottom: 15px;
+}
+/* LOGIN */
+#loginBox{
+width:90%;
+max-width:360px;
+background:rgba(0,0,0,.8);
+border-radius:30px;
+padding:25px;
+text-align:center;
+}
+video{width:100%;border-radius:20px;margin-bottom:15px}
+input,select,button{
+width:100%;margin:8px 0;padding:12px;
+border-radius:14px;border:none;font-size:15px
+}
+input,select{background:#111;color:white}
+button{
+background:red;color:white;font-weight:bold;
+cursor:pointer;transition:.3s
+}
+button.loading{
+width:50px;height:50px;border-radius:50%;
+padding:0;background:#222;border:4px solid #444;
+border-top:4px solid red;animation:spin 1s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HOME */
+#home{display:none;width:100%;height:100%;overflow:auto;padding:15px}
+.card{
+background:#111;border-radius:20px;
+padding:15px;margin-bottom:15px
+}
+
+/* POPUP */
+#popup{
+display:none;position:fixed;top:50%;left:50%;
+transform:translate(-50%,-50%);
+background:#111;padding:20px;border-radius:20px;
+text-align:center;z-index:999;width:80%;max-width:280px
+}
+#popupIcon{font-size:50px;margin-bottom:10px}
+.success{color:#0f0}.error{color:#f00}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+<video autoplay loop muted src="https://o.uguu.se/VpbFyOzh.mp4"></video>
+<!-- TEXT -->
+<div class="login-title">Welcome Back</div>
+<div class="login-subtitle">Sign in to continue</div>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<button id="loginBtn" onclick="login()">Sign In</button>
+</div>
+
+<!-- HOME -->
+<div id="home">
+
+<div class="card">
+<video autoplay loop muted src="https://o.uguu.se/VpbFyOzh.mp4"></video>
+<h2>DARK SYNTERN</h2>
+</div>
+
+<div class="card" id="profil"></div>
+
+<div class="card">
+<h3>Kirim Pesan</h3>
+<input id="target" placeholder="Nomor WhatsApp">
+<input id="pesan" placeholder="Pesan">
+<button onclick="sendMsg()">KIRIM</button>
+</div>
+
+<div class="card">
+<h3>Status Bot</h3>
+<span id="botStatus">Offline</span><br><br>
+<img id="qr" style="width:100%;display:none;border-radius:15px">
+<button onclick="loadQR()">Refresh QR</button>
+</div>
+
+<div class="card" id="akunMenu" style="display:none">
+<h3>Buat Akun</h3>
+<input id="newUser" placeholder="Username">
+<input id="newPass" placeholder="Password">
+<select id="newRole"></select>
+<select id="newExp">
+<option value="permanent">Permanen</option>
+<option value="1month">1 Bulan</option>
+</select>
+<button onclick="buatAkun()">BUAT AKUN</button>
+</div>
+
+<div class="card" id="listAkun"></div>
+
+</div>
+
+<!-- POPUP -->
+<div id="popup">
+<div id="popupIcon"></div>
+<div id="popupMsg"></div>
+</div>
+
+<script>
+const API = "http://rezuki-kun.ct.ws:3000"
+let currentUser=null
+let token=null
+
+function popup(type,msg){
+popupIcon.innerHTML=type==='ok'?'✔':'✖'
+popupIcon.className=type==='ok'?'success':'error'
+popupMsg.innerText=msg
+popup.style.display='block'
+setTimeout(()=>popup.style.display='none',2000)
+}
+
+async function login(){
+loginBtn.classList.add('loading')
+loginBtn.innerText=''
+
+const r = await fetch(API+'/login',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+username:username.value,
+password:password.value
+})
+})
+const d = await r.json()
+
+loginBtn.classList.remove('loading')
+loginBtn.innerText='LOGIN'
+
+if(!d.success) return popup('err','Username atau password salah')
+
+token = d.token
+currentUser = d.user
+
+loginBox.style.display='none'
+home.style.display='block'
+
+profil.innerHTML = `
+<b>Username:</b> ${d.user.username}<br>
+<b>Role:</b> ${d.user.role}<br>
+<b>Status Bot:</b> <span id="sb">Offline</span>
+`
+
+setupRole()
+loadQR()
+loadAkun()
+}
+
+function setupRole(){
+if(['creator','owner','reseller'].includes(currentUser.role)){
+akunMenu.style.display='block'
+newRole.innerHTML=''
+if(currentUser.role==='creator')
+ newRole.innerHTML='<option>owner</option><option>reseller</option><option>member</option>'
+if(currentUser.role==='owner')
+ newRole.innerHTML='<option>reseller</option><option>member</option>'
+if(currentUser.role==='reseller')
+ newRole.innerHTML='<option>member</option>'
+}
+}
+
+async function loadQR(){
+const r=await fetch(API+'/get-qr',{headers:{authorization:token}})
+const d=await r.json()
+if(d.qr){
+qr.src=d.qr;qr.style.display='block'
+botStatus.innerText='Offline'
+}else{
+qr.style.display='none'
+botStatus.innerText='Online'
+sb.innerText='Online'
+}
+}
+
+async function sendMsg(){
+if(botStatus.innerText!=='Online')
+ return popup('err','Bot belum terhubung')
+
+const r=await fetch(API+'/send',{
+method:'POST',
+headers:{
+ 'Content-Type':'application/json',
+ authorization:token
+},
+body:JSON.stringify({
+number:target.value,
+message:pesan.value
+})
+})
+const d=await r.json()
+if(d.success) popup('ok','Pesan terkirim')
+else popup('err',d.error)
+}
+
+async function buatAkun(){
+const r=await fetch(API+'/akun-baru',{
+method:'POST',
+headers:{
+ 'Content-Type':'application/json',
+ authorization:token
+},
+body:JSON.stringify({
+username:newUser.value,
+password:newPass.value,
+role:newRole.value,
+expired:newExp.value
+})
+})
+const d=await r.json()
+if(d.success){
+ popup('ok','Akun berhasil dibuat')
+ loadAkun()
+}else popup('err',d.error)
+}
+
+async function loadAkun(){
+const r=await fetch(API+'/list-akun',{headers:{authorization:token}})
+const d=await r.json()
+let html='<h3>List Akun</h3>'
+d.forEach(a=>{
+ html+=`<div>${a.username} | ${a.role}</div>`
+})
+listAkun.innerHTML=html
+}
+</script>
+
+</body>
+</html>
